@@ -1,60 +1,109 @@
-# Bitwarden Touch ID in Dia (macOS)
+# Bitwarden Touch ID in Dia on macOS
 
-This is a community workaround for a Dia extension permission prompt that can stall when Bitwarden requests `nativeMessaging` from its pop-out window. It was verified on macOS 27.0, Dia 1.50.1, Bitwarden Desktop 2026.9.0, and Bitwarden extension 2026.9.2. Other versions may behave differently.
+**Languages:** English · [繁體中文](README.zh-Hant.md) · [简体中文](README.zh-Hans.md)
+
+This community workaround helps the official Bitwarden browser extension use Bitwarden Desktop for Touch ID unlock in Dia. It was verified on **macOS 27.0, Dia 1.50.1, Bitwarden Desktop 2026.9.0, and Bitwarden extension 2026.9.2**. It may need adjustment for other versions.
 
 The workaround has two parts:
 
-1. Install Bitwarden's native messaging host manifest in Dia's browser directory.
-2. Request the extension's optional `nativeMessaging` permission from a normal Dia tab. **You must review and approve Dia's permission prompt yourself.**
+1. Install Bitwarden's native messaging host manifest in Dia's browser directory. This tells Dia where to find Bitwarden Desktop's `desktop_proxy`.
+2. Request the extension's optional `nativeMessaging` permission from a **normal browser tab**. In the tested version, Bitwarden's automatic request from its pop-out window hung without a Dia permission prompt or callback. The same request from a normal tab showed Dia's prompt and succeeded.
 
-The helper never reads vault data, changes your password, edits browser `Secure Preferences`, or changes the Bitwarden extension files.
-It accepts only the official Chrome Web Store Bitwarden extension ID; another extension using the same display name will be rejected.
+**You review and approve the browser permission prompt yourself.** Nothing here changes Dia's code or Bitwarden's extension package.
 
-## Requirements
+## Before you start
 
-- Dia, Bitwarden Desktop, and the Bitwarden browser extension installed on macOS.
-- Touch ID already working in Bitwarden Desktop. Keep Desktop running and unlocked during setup.
-- A Chrome native messaging manifest at `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.8bit.bitwarden.json`.
+You need:
+
+- Dia, Bitwarden Desktop, and the **official Chrome Web Store Bitwarden Password Manager extension** installed in Dia.
+- Touch ID already enabled and working in Bitwarden Desktop. Keep Desktop running, signed in, and unlocked during setup.
+- A Chrome Bitwarden native messaging manifest at `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.8bit.bitwarden.json`. This helper uses it as the source and does not modify it.
 - Python 3 available as `python3`.
 
-## Install the native messaging host
+The helper accepts only the official extension ID `nngceckbapebfimnlniiiahkandclblb`. It discovers the installed ID in Dia, checks the extension's localized name, and rejects a different ID even if it uses the same name.
 
-Run from this folder:
+## Quick start
+
+### 1. Check the local installation
+
+In Terminal, change to this repository's directory and run:
 
 ```sh
 python3 install_host.py
+```
+
+This is a **read-only check**. It prints the detected Dia application, Dia data directory, Bitwarden extension ID, Chrome source manifest, Dia destination, desktop proxy, and the extension URL to use later. If it says `already correct`, skip the next command.
+
+If it says `installation needed`, run:
+
+```sh
 python3 install_host.py --apply
 ```
 
-The first command checks the app, extension ID, Chrome manifest, and destination without changing anything. The second copies the Chrome manifest into Dia's `NativeMessagingHosts` directory and adds the detected Dia Bitwarden extension ID to `allowed_origins` if needed. It leaves Chrome's file untouched. If Dia already has a different manifest, the helper makes a timestamped backup alongside it before replacing it. Re-running it when the destination is already correct makes no change.
+The helper validates the JSON and proxy, creates Dia's `NativeMessagingHosts` directory if needed, and writes `com.8bit.bitwarden.json` there. If a different Dia manifest already exists, it saves a timestamped `.backup-*` copy beside it **before** replacing it. A second run with the same contents makes no change. The Chrome source file is never edited.
 
-Quit and reopen Dia after installation.
+**Quit Dia completely and reopen it** after changing the manifest.
 
-## Grant the extension permission
+### 2. Request permission from a normal Dia tab
 
-1. In Dia, open the Bitwarden extension and unlock it if necessary. Keep Bitwarden Desktop open and unlocked.
-2. Open the Bitwarden popup page in a **normal Dia tab**. The URL is printed by `install_host.py`; for the Chrome Web Store extension it is usually:
+1. In Dia, unlock the Bitwarden extension if necessary. Keep Bitwarden Desktop open and unlocked.
+2. Open the extension's account security page in a **normal Dia tab**, not its toolbar popup or pop-out window. Use the URL printed by the helper. For the official extension it is:
 
    ```text
    chrome-extension://nngceckbapebfimnlniiiahkandclblb/popup/index.html#/account-security
    ```
 
-3. Open that tab's Developer Tools (`Option-Command-I`) and select **Console**.
-4. Paste the contents of [`request-permission.js`](request-permission.js) into the Console and press Enter. It adds a temporary yellow button to this tab. Review the snippet before pasting.
-5. Click **Request Bitwarden nativeMessaging permission**. Dia should show a browser permission prompt. Check that it names **Bitwarden Password Manager**, then choose **Allow** if you want this integration.
-6. The Console should print `Permission granted: true`. Close or reload the tab to remove the temporary button. The permission itself is saved by Dia.
-7. In Bitwarden's normal extension popup, open **Settings → Account security → Unlock with biometrics**. Complete any Bitwarden Desktop confirmation and Touch ID prompt. Finally, lock the extension and verify that Touch ID unlocks it.
+3. With that tab active, open Developer Tools using **Option-Command-I** and select **Console**.
+4. Read [`request-permission.js`](request-permission.js), then paste its entire contents into the Console and press Enter. It adds a yellow **Request Bitwarden nativeMessaging permission** button to the page. The snippet checks the extension ID before doing anything.
+5. Click the yellow button. This actual user click is required by the browser's permission API. Dia should show a prompt saying **Bitwarden Password Manager** has requested additional permissions. Check the extension name, then choose **Allow** if you want to connect it to native applications.
+6. The Console should show `Permission granted: true`. Close the test tab; the temporary button disappears. Dia retains the permission in that profile.
 
-The script cannot grant browser permissions: the request must come from the extension page after a user click, and the browser's approval belongs to you. [Chrome's permission API documentation](https://developer.chrome.com/docs/extensions/reference/api/permissions) describes this runtime flow.
+The Terminal helper cannot perform this step. Browser permissions must be requested from the extension page and approved in Dia's own UI. See [Chrome's runtime permission API](https://developer.chrome.com/docs/extensions/reference/api/permissions).
+
+### 3. Finish setup in Bitwarden and verify
+
+1. Open Bitwarden's normal extension popup in Dia.
+2. Go to **Settings → Account security → Unlock with biometrics**. Follow any Bitwarden Desktop confirmation or Touch ID prompt. If the extension locks during setup, unlock it and try the setting again.
+3. Lock the extension, then use its **Unlock with biometrics** option. A successful Touch ID unlock is the end-to-end check; a saved browser permission alone does not prove Desktop pairing works.
+
+## What the helper changes
+
+| Item | Action |
+| --- | --- |
+| Chrome's `com.8bit.bitwarden.json` | Read only |
+| Dia's `NativeMessagingHosts/com.8bit.bitwarden.json` | Created or replaced by `--apply` |
+| Existing Dia host manifest | Backed up next to the destination before replacement |
+| Dia extension permission | Granted only through Dia's prompt after your click |
+| Bitwarden vault, extension package, browser `Secure Preferences` | Not read or modified by the helper |
+
+The helper copies Chrome's manifest fields and adds the detected Dia Bitwarden extension origin to `allowed_origins` only if it is missing. It verifies that the manifest points to an executable `desktop_proxy`. It does **not** copy Chrome's extension permission state: permissions belong to each browser profile.
+
+For nonstandard install locations, run `python3 install_host.py --help` to see `--dia-app`, `--dia-data`, and `--chrome-manifest`. Check the paths carefully before using `--apply`.
 
 ## Troubleshooting
 
-- If no browser prompt appears in the normal tab, confirm the tab URL begins with `chrome-extension://` and belongs to Bitwarden; the Console snippet refuses other extension IDs.
-- If Dia grants permission but Bitwarden cannot find Desktop, check that `com.8bit.bitwarden.json` exists in Dia's `NativeMessagingHosts` directory, its `path` is an executable `desktop_proxy`, and Desktop is running.
-- If the helper reports an unexpected extension ID, stop and verify where that extension came from. This guide supports the official Chrome Web Store build.
-- If Bitwarden asks for the permission again after an extension reinstall or profile change, run the helper again and repeat the permission step in the affected Dia profile.
-- To undo the host installation, restore the timestamped backup if one was made; otherwise remove only Dia's `com.8bit.bitwarden.json`. Dia's extension permission can be removed by uninstalling the extension from the affected profile.
+| Symptom | Check |
+| --- | --- |
+| `No installed Bitwarden extension was found` | Install the official extension in Dia, then rerun the check. |
+| `unexpected ID` | Stop and verify the extension's source. This guide supports the official Chrome Web Store ID only. |
+| Chrome manifest or `desktop_proxy` missing | Open Bitwarden Desktop and check that its browser integration has installed the Chrome manifest. This helper needs a valid Chrome source. |
+| Dia still does not show a permission prompt | Confirm the URL starts with `chrome-extension://` and is open as a **normal tab**. Run the snippet in that tab's Console and click the yellow button; pasting `chrome.permissions.request(...)` directly into Console does not provide the required user click. |
+| Console reports `Permission granted: false` | Retry the prompt and check your choice. Do not edit `Secure Preferences` to force a grant. |
+| Permission granted, but Desktop is not found | Confirm the Dia host manifest exists, its `path` points to an executable `desktop_proxy`, and Bitwarden Desktop is running and unlocked. Quit and reopen Dia after a manifest change. |
+| Setup works in one Dia profile but not another | Browser permissions are profile-specific. Open the Bitwarden page in the affected profile and repeat the permission step there. |
 
-## Related issue
+## Undo the host installation
 
-[Bitwarden issue #14274](https://github.com/bitwarden/clients/issues/14274) reported Dia biometric unlock failures in 2025. The issue is closed, but the permission request from the pop-out window still stalled in the environment tested here. The [bug report draft](BUG_REPORT.md) contains the reproduction details.
+The helper's only persistent file change is Dia's `com.8bit.bitwarden.json`.
+
+- If the helper printed a backup path, restore **that** backup to Dia's `NativeMessagingHosts/com.8bit.bitwarden.json` after quitting Dia.
+- If no Dia host file existed before installation, remove only Dia's `com.8bit.bitwarden.json` after quitting Dia.
+- Reopen Dia. Do not delete Bitwarden vault files, the Chrome source manifest, or browser profile files.
+
+The separate `nativeMessaging` permission is stored by Dia in the affected profile. This helper does not alter it, and restoring the host file does not revoke it.
+
+## Why this is a workaround
+
+In the tested environment, Bitwarden's pop-out window invoked `chrome.permissions.request({ permissions: ["nativeMessaging"] })` with a valid user gesture, but Dia did not display a permission prompt or call the callback. The normal-tab button invoked the **same API** and Dia returned `true` after the user approved it. This narrows the observed problem to Dia's handling of that window/request flow; it does not identify a specific line of Dia code.
+
+[Bitwarden issue #14274](https://github.com/bitwarden/clients/issues/14274) reported Dia biometric unlock failures in 2025. The issue is closed. See [`BUG_REPORT.md`](BUG_REPORT.md) for a concise reproduction report.
