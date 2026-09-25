@@ -18,7 +18,7 @@
 - macOS 上已安裝 Dia、Bitwarden Desktop，以及從 **Chrome 線上應用程式商店**安裝到 Dia 的官方 Bitwarden Password Manager 擴充套件。
 - Bitwarden Desktop 已啟用 Touch ID，且 Touch ID 能正常解鎖。設定期間請讓桌面版保持執行、登入並解鎖。
 - Chrome 的 Bitwarden 主機清單已存在於 `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.8bit.bitwarden.json`。輔助程式會以它為來源，不會修改它。
-- 終端機可執行 `python3`。
+- 終端機可執行 Python 3.10 或更新版本的 `python3`。
 
 輔助程式只接受官方擴充套件 ID `nngceckbapebfimnlniiiahkandclblb`。它會在 Dia 中尋找已安裝的 ID、核對擴充套件的本地化名稱；即使其他擴充套件使用相同名稱，只要 ID 不同也會拒絕。
 
@@ -76,9 +76,17 @@ python3 install_host.py --apply
 | Dia 的擴充套件權限 | 只能在你點擊後，透過 Dia 的提示授予 |
 | Bitwarden 密碼庫、擴充套件檔案、瀏覽器 `Secure Preferences` | 輔助程式不讀取或修改 |
 
-輔助程式會複製 Chrome 清單的欄位；只有當 Dia 中找到的 Bitwarden 擴充套件來源未列於 `allowed_origins` 時才補上。它也會確認清單指向可執行的 `desktop_proxy`。它**不會**複製 Chrome 的擴充套件授權狀態：權限屬於各瀏覽器設定檔。
+輔助程式會複製 Chrome 清單的欄位；只有當 Dia 中找到的 Bitwarden 擴充套件來源未列於 `allowed_origins` 時才補上。它也會確認 `desktop_proxy` 可執行、位於 `Bitwarden.app` 中，且具有有效的 Bitwarden Inc. macOS 程式碼簽章。它**不會**複製 Chrome 的擴充套件授權狀態：權限屬於各瀏覽器設定檔。
 
 安裝位置不標準時，可執行 `python3 install_host.py --help` 查看 `--dia-app`、`--dia-data` 和 `--chrome-manifest`。使用 `--apply` 前請仔細核對路徑。
+
+## 安全與隱私
+
+- `chrome-extension://...` 是**已安裝 Bitwarden 擴充套件內的頁面**，不是網站，也不是你的密碼庫連結。網址中的 ID 是官方 Chrome 線上應用程式商店擴充套件的公開 ID，不是個人識別碼。
+- 輔助程式只使用本機檔案和 macOS `codesign`，不會發送網路請求。GitHub 儲存庫沒有收錄你的密碼庫、本機清單、備份、電子郵件地址或完整家目錄路徑。
+- `nativeMessaging` 權限讓 Bitwarden 擴充套件與已註冊的本機程式通信。主機清單中的 `allowed_origins` 限制哪些擴充套件 ID 能啟動該主機。這是有實際能力的權限，請只對官方擴充套件和具有效 Bitwarden 簽章的桌面版同意。
+- 在密碼管理器的 DevTools Console 貼上 JavaScript 具有很高權限。執行前請閱讀當下的片段，日後重新使用時也要再次檢查。此片段只核對擴充套件 ID、加入暫時按鈕，並在你點擊後要求權限；不會讀取密碼庫項目或把資料送到伺服器。
+- 輔助程式把 Chrome 清單視為輸入資料，並驗證目標程式的簽章。如果本機 Chrome 清單或應用程式看起來有異常，請停止，不要略過驗證錯誤。
 
 ## 疑難排解
 

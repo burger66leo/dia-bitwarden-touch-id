@@ -18,7 +18,7 @@ You need:
 - Dia, Bitwarden Desktop, and the **official Chrome Web Store Bitwarden Password Manager extension** installed in Dia.
 - Touch ID already enabled and working in Bitwarden Desktop. Keep Desktop running, signed in, and unlocked during setup.
 - A Chrome Bitwarden native messaging manifest at `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.8bit.bitwarden.json`. This helper uses it as the source and does not modify it.
-- Python 3 available as `python3`.
+- Python 3.10 or newer available as `python3`.
 
 The helper accepts only the official extension ID `nngceckbapebfimnlniiiahkandclblb`. It discovers the installed ID in Dia, checks the extension's localized name, and rejects a different ID even if it uses the same name.
 
@@ -76,9 +76,17 @@ The Terminal helper cannot perform this step. Browser permissions must be reques
 | Dia extension permission | Granted only through Dia's prompt after your click |
 | Bitwarden vault, extension package, browser `Secure Preferences` | Not read or modified by the helper |
 
-The helper copies Chrome's manifest fields and adds the detected Dia Bitwarden extension origin to `allowed_origins` only if it is missing. It verifies that the manifest points to an executable `desktop_proxy`. It does **not** copy Chrome's extension permission state: permissions belong to each browser profile.
+The helper copies Chrome's manifest fields and adds the detected Dia Bitwarden extension origin to `allowed_origins` only if it is missing. It verifies that `desktop_proxy` is executable, belongs to `Bitwarden.app`, and has a valid Bitwarden Inc. macOS code signature. It does **not** copy Chrome's extension permission state: permissions belong to each browser profile.
 
 For nonstandard install locations, run `python3 install_host.py --help` to see `--dia-app`, `--dia-data`, and `--chrome-manifest`. Check the paths carefully before using `--apply`.
+
+## Security and privacy
+
+- The `chrome-extension://...` URL is a page **inside the installed Bitwarden extension**, not a website or a link to your vault. Its ID is the public ID of the official Chrome Web Store extension, not a personal identifier.
+- The helper uses only local files and macOS `codesign`; it makes no network requests. The GitHub repository does not include your vault, local manifests, backups, email address, or full home-directory path.
+- The `nativeMessaging` permission lets the Bitwarden extension communicate with a registered local program. The host manifest's `allowed_origins` limits which extension IDs can start this host. This is a meaningful permission: approve it only for the official extension and a validly signed Bitwarden Desktop app.
+- Pasting JavaScript into a password manager's DevTools Console is powerful. Read the exact snippet before running it and re-check it if you return to this repository later. The snippet only checks the extension ID, adds a temporary button, and requests the permission after your click; it does not read vault items or send data to a server.
+- The helper treats Chrome's manifest as input and validates the target binary's signature. If either your local Chrome manifest or the app bundle looks suspicious, stop rather than bypassing a validation error.
 
 ## Troubleshooting
 

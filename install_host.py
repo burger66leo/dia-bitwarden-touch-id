@@ -8,6 +8,7 @@ import os
 import plistlib
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -15,6 +16,7 @@ from pathlib import Path
 HOST_NAME = "com.8bit.bitwarden"
 EXTENSION_NAME = "Bitwarden Password Manager"
 DEFAULT_ID = "nngceckbapebfimnlniiiahkandclblb"
+BITWARDEN_TEAM_ID = "LTZ2PFU5D6"
 ID_PATTERN = re.compile(r"[a-p]{32}")
 
 
@@ -103,10 +105,44 @@ def validate_source(source: Path) -> dict:
     if manifest.get("name") != HOST_NAME or manifest.get("type") != "stdio":
         fail("Chrome's manifest is not the expected Bitwarden native messaging host.")
     binary = manifest.get("path")
-    if not isinstance(binary, str) or Path(binary).name != "desktop_proxy":
+    if not isinstance(binary, str) or not Path(binary).is_absolute():
+        fail("Chrome's manifest must point to an absolute desktop_proxy path.")
+    binary_path = Path(binary)
+    if binary_path.name != "desktop_proxy":
         fail("Chrome's manifest does not point to a Bitwarden desktop_proxy binary.")
-    if not Path(binary).is_file() or not os.access(binary, os.X_OK):
+    if not binary_path.is_file() or not os.access(binary, os.X_OK):
         fail(f"The desktop_proxy in Chrome's manifest is not executable: {binary}")
+    resolved_binary = binary_path.resolve()
+    if len(resolved_binary.parents) < 3:
+        fail("The desktop_proxy is not inside a Bitwarden.app bundle.")
+    app = resolved_binary.parents[2]
+    if (resolved_binary.parent.name != "MacOS" or
+            resolved_binary.parent.parent.name != "Contents" or
+            app.name != "Bitwarden.app"):
+        fail("The desktop_proxy is not inside a Bitwarden.app bundle.")
+    try:
+        with (app / "Contents/Info.plist").open("rb") as stream:
+            app_info = plistlib.load(stream)
+    except (OSError, ValueError) as exc:
+        fail(f"Cannot read Bitwarden.app metadata: {exc}")
+    if app_info.get("CFBundleIdentifier") != "com.bitwarden.desktop":
+        fail("The desktop_proxy is not inside the official Bitwarden Desktop app.")
+    try:
+        verification = subprocess.run(
+            ["codesign", "--verify", "--strict", str(resolved_binary)],
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+        signature = subprocess.run(
+            ["codesign", "-dv", "--verbose=2", str(resolved_binary)],
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        fail(f"Could not verify Bitwarden's code signature: {exc}")
+    details = signature.stdout + signature.stderr
+    if (verification.returncode != 0 or signature.returncode != 0 or
+            f"TeamIdentifier={BITWARDEN_TEAM_ID}" not in details or
+            "Identifier=com.bitwarden.desktop" not in details):
+        fail("The desktop_proxy is not validly signed by Bitwarden Inc.")
     origins = manifest.get("allowed_origins")
     if not isinstance(origins, list) or not all(isinstance(x, str) for x in origins):
         fail("Chrome's manifest has no valid allowed_origins list.")

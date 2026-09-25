@@ -18,7 +18,7 @@
 - macOS 上已安装 Dia、Bitwarden Desktop，以及从 **Chrome 网上应用店**安装到 Dia 的官方 Bitwarden Password Manager 扩展。
 - Bitwarden Desktop 已启用 Touch ID，且 Touch ID 可以正常解锁。设置期间请让桌面版保持运行、登录并解锁。
 - Chrome 的 Bitwarden 主机清单已存在于 `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.8bit.bitwarden.json`。辅助程序会以它为来源，不会修改它。
-- 终端可以运行 `python3`。
+- 终端可以运行 Python 3.10 或更新版本的 `python3`。
 
 辅助程序只接受官方扩展 ID `nngceckbapebfimnlniiiahkandclblb`。它会在 Dia 中查找已安装的 ID、核对扩展的本地化名称；即使其他扩展使用相同名称，只要 ID 不同也会被拒绝。
 
@@ -76,9 +76,17 @@ python3 install_host.py --apply
 | Dia 的扩展权限 | 只能在你点击后，通过 Dia 的提示授予 |
 | Bitwarden 密码库、扩展文件、浏览器 `Secure Preferences` | 辅助程序不读取或修改 |
 
-辅助程序会复制 Chrome 清单的字段；只有当 Dia 中找到的 Bitwarden 扩展来源未列于 `allowed_origins` 时才补上。它还会确认清单指向可执行的 `desktop_proxy`。它**不会**复制 Chrome 的扩展授权状态：权限属于各浏览器配置文件。
+辅助程序会复制 Chrome 清单的字段；只有当 Dia 中找到的 Bitwarden 扩展来源未列于 `allowed_origins` 时才补上。它还会确认 `desktop_proxy` 可执行、位于 `Bitwarden.app` 中，且具有有效的 Bitwarden Inc. macOS 代码签名。它**不会**复制 Chrome 的扩展授权状态：权限属于各浏览器配置文件。
 
 安装位置不标准时，可运行 `python3 install_host.py --help` 查看 `--dia-app`、`--dia-data` 和 `--chrome-manifest`。使用 `--apply` 前请仔细核对路径。
+
+## 安全与隐私
+
+- `chrome-extension://...` 是**已安装 Bitwarden 扩展内部的页面**，不是网站，也不是你的密码库链接。网址中的 ID 是官方 Chrome 网上应用店扩展的公开 ID，不是个人标识符。
+- 辅助程序只使用本机文件和 macOS `codesign`，不会发送网络请求。GitHub 仓库没有收录你的密码库、本机清单、备份、电子邮件地址或完整主目录路径。
+- `nativeMessaging` 权限让 Bitwarden 扩展与已注册的本机程序通信。主机清单中的 `allowed_origins` 限制哪些扩展 ID 能启动该主机。这是具有实际能力的权限，请只对官方扩展和具有有效 Bitwarden 签名的桌面版同意。
+- 在密码管理器的 DevTools Console 粘贴 JavaScript 具有很高权限。运行前请阅读当时的代码片段，日后重新使用时也要再次检查。此片段只核对扩展 ID、添加临时按钮，并在你点击后请求权限；不会读取密码库条目或把数据发送到服务器。
+- 辅助程序把 Chrome 清单视为输入数据，并验证目标程序的签名。如果本机 Chrome 清单或应用程序看起来有异常，请停止，不要跳过验证错误。
 
 ## 故障排查
 
